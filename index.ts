@@ -25,23 +25,22 @@ type repoNormal = {
     branchName: string;
 }
 
-interface GitDown {
+class GitDown {
     opts: any
     Clone: boolean
     SSH: boolean
-}
 
-class GitDown {
     constructor(opts = {}, Clone = true, SSH = false) {
         this.opts = opts
         this.Clone = Clone
         this.SSH = SSH
     }
+    
     async download(repoUrl: string, dest: string) {
         const repo = this.parse(repoUrl)
         const url = this.getRepoUrl(repo)
         if (this.Clone) {
-            return await gitClone(repo, url, dest)
+            return await gitClone(repo, url, dest, this.opts)
         }
         return await urlDown(url, dest)
     }
@@ -138,11 +137,11 @@ function addProtocol(origin: string, isSSH: boolean) {
     return origin
 }
 
-async function gitClone(repo, url, dest) {
+async function gitClone(repo, url, dest, opts) {
     const cloneOptions = {
         checkout: repo.branchName,
         shallow: repo.branchName === 'master',
-        ...this.opts
+        ...opts
     }
     try {
         const result = await new Promise((resolve, reject) => {
@@ -188,3 +187,5 @@ async function urlDown(url, dest) {
     }
 
 }
+
+export default GitDown
