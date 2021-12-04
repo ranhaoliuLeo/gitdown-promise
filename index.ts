@@ -11,78 +11,64 @@ const Github = "github"
 const Gitlab = "gitlab"
 const Bitbucket = "bitbucket"
 
-// origin that request from 
-// type origin = 'github' | 'gitlab' | 'bitbucket'
+type repoDirect = {
+    type: string;
+    url: string;
+    branchName: string;
+}
+
+type repoNormal = {
+    type: string;
+    origin: string;
+    owner: string;
+    name: string;
+    branchName: string;
+}
 
 interface GitDown {
     opts: any
-    isClone: boolean
-    isSSH: boolean
+    Clone: boolean
+    SSH: boolean
 }
 
 class GitDown {
-    constructor(opts = {}, isClone = true, isSSH = false) {
+    constructor(opts = {}, Clone = true, SSH = false) {
         this.opts = opts
-        this.isClone = isClone
-        this,isSSH = isSSH
+        this.Clone = Clone
+        this.SSH = SSH
     }
-    async download(repo, dest): Promise<void> {
-        return new Promise((resolve, reject) => {
-            repo = init(repo)
-            let url
-            if (repo.type === Direct) {
-                url = repo.url
-            } else {
-                url = this.getUrl(repo)
-            }
-            if (this.isClone) {
-                const cloneOptions = {
-                    checkout: repo.branchName,
-                    shallow: repo.branchName === 'master',
-                    ...this.opts
-                }
-                gitclone(url, dest, cloneOptions, function (err) {
-                    if (err === undefined) {
-                        rm(dest + '/.git')
-                        resolve()
-                    } else {
-                        reject(err)
-                    }
-                })
-                return 
-            }
-            const downloadOptions = {
-                extract: true,
-                strip: 1,
-                mode: '666',
-                ...this.opts,
-                headers: {
-                    accept: 'application/zip',
-                    ...(this.opts.headers || {})
-                }
-            }
-            downloadUrl(url, dest, downloadOptions)
-                .then(function (data) {
-                    resolve()
-                })
-                .catch(function (err) {
-                    reject(err)
-                })
-        })
+    async download(repoUrl: string, dest: string) {
+        const repo = this.parse(repoUrl)
+        const url = this.getRepoUrl(repo)
+        if (this.Clone) {
+            return await gitClone(repo, url, dest)
+        }
+        return await urlDown(url, dest)
     }
 
-    getUrl(repo) {
+    parse(repoUrl: string) {
+        let match = DirectUrlReg.exec(repoUrl)
+        if (match) {
+            return getRepoDirect(match)
+        }
+        match = NormalUrlReg.exec(repoUrl)
+        if (match) {
+            return getRepoNormal(match)
+        }
+    }
+
+    getUrl(repo): string {
         let result
         // Get origin with protocol and add trailing slash or colon (for ssh)
-        var origin = addProtocol(repo.origin, this.isSSH)
+        var origin = addProtocol(repo.origin, this.SSH)
         if (/^git@/i.test(origin)) {
             origin = origin + ':'
         } else {
             origin = origin + '/'
         }
-    
+
         // Build url
-        if (this.isClone) {
+        if (this.Clone) {
             result = origin + repo.owner + '/' + repo.name + '.git'
         } else {
             if (repo.type === 'github') {
@@ -93,19 +79,15 @@ class GitDown {
                 result = origin + repo.owner + '/' + repo.name + '/get/' + repo.checkout + '.zip'
             }
         }
-    
+
         return result
     }
-}
 
-function init(repoUrl: string) {
-    let match = DirectUrlReg.exec(repoUrl)
-    if (match) {
-        return getRepoDirect(match)
-    }
-    match = NormalUrlReg.exec(repoUrl)
-    if (match) {
-        return getRepoNormal(match)
+    getRepoUrl(repo: repoDirect | repoNormal) {
+        if (repo.type === Direct) {
+            return (repo as repoDirect).url
+        }
+        return this.getUrl(repo)
     }
 }
 
@@ -156,3 +138,53 @@ function addProtocol(origin: string, isSSH: boolean) {
     return origin
 }
 
+async function gitClone(repo, url, dest) {
+    const cloneOptions = {
+        checkout: repo.branchName,
+        shallow: repo.branchName === 'master',
+        ...this.opts
+    }
+    try {
+        const result = await new Promise((resolve, reject) => {
+            gitclone(url, dest, cloneOptions, function (err) {
+                if (err === undefined) {
+                    rm(dest + '/.git')
+                    resolve(0)
+                } else {
+                    reject(err)
+                }
+            })
+        })
+        return result
+    } catch (err) {
+        throw new Error(err)
+    }
+}
+
+async function urlDown(url, dest) {
+    const downloadOptions = {
+        extract: true,
+        strip: 1,
+        mode: '666',
+        ...this.opts,
+        headers: {
+            accept: 'application/zip',
+            ...(this.opts.headers || {})
+        }
+    }
+    try {
+        const result = await new Promise((resolve, reject) => {
+            downloadUrl(url, dest, downloadOptions)
+                .then(function (data) {
+                    resolve(0)
+                })
+                .catch(function (err) {
+                    reject(err)
+                })
+        })
+        return result
+    } catch (err) {
+        throw new Error(err)
+    }
+
+}
