@@ -2,8 +2,6 @@
   "name": "gitdown-promise",
   "version": "1.0.0",
   "license": "MIT",
-  "repository": "gitlab:flippidippi/download-git-repo",
-  "description": "Download and extract a git repository (GitHub, GitLab, Bitbucket) from node.",
   "keywords": [
     "download",
     "github",
